@@ -1,0 +1,19 @@
+# TextDNA 2.0 -- core dependencies (all CPU, runs fully locally)
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.2
+spacy==3.8.18
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+scikit-learn==1.9.1
+numpy==2.5.4
+
+# development / evaluation
+pytest==9.2.0
+httpx==0.28.1
+
+# dense sentence embeddings for the semantic layer (CPU build of torch).
+# if this is unavailable at runtime (not installed, or the model cannot
+# be downloaded), TextDNA automatically falls back to TF-IDF vectors and
+# reports the backend it actually used in every response.
+sentence-transformers==6.2.0
+torch==2.15.0+cpu
