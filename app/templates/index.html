@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TextDNA -- text intelligence engine</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 860px; padding: 0 1rem; color: #1c2430; }
+  h1 { margin-bottom: 0.2rem; }
+  p.sub { color: #5a6a7d; margin-top: 0; }
+  textarea { width: 100%; height: 160px; padding: 0.6rem; font-size: 1rem; box-sizing: border-box; }
+  button { margin-top: 0.6rem; padding: 0.55rem 1.4rem; font-size: 1rem; cursor: pointer; }
+  .score { font-size: 2rem; font-weight: 700; }
+  .bar { background: #e6ebf0; border-radius: 6px; height: 14px; margin: 0.4rem 0 1rem; }
+  .bar > div { background: #2e7d4f; height: 14px; border-radius: 6px; }
+  section { border-top: 1px solid #d8dee5; margin-top: 1.2rem; padding-top: 0.8rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+  pre { background: #f4f6f8; padding: 0.8rem; overflow-x: auto; font-size: 0.85rem; }
+  .flag { color: #9c2b2e; }
+  .ok { color: #2e7d4f; }
+  li { margin: 0.25rem 0; }
+</style>
+</head>
+<body>
+<h1>TextDNA</h1>
+<p class="sub">Multi-layer NLP analysis: entities, semantics, argument structure,
+fallacy and bias signals, and a composite TextDNA Score. Everything runs locally.</p>
+
+<textarea id="text" placeholder="Paste or type the text to analyse..."></textarea>
+<br>
+<button id="go">Analyse</button>
+<p id="status"></p>
+
+<div id="report" hidden>
+  <section>
+    <div class="score">TextDNA Score: <span id="overall"></span>/100</div>
+    <div class="bar"><div id="barfill"></div></div>
+    <p id="summary"></p>
+    <pre id="subscores"></pre>
+  </section>
+  <section>
+    <h2>Entities</h2>
+    <ul id="entities"></ul>
+  </section>
+  <section>
+    <h2>Argument structure</h2>
+    <p id="argument"></p>
+    <ul id="roles"></ul>
+  </section>
+  <section>
+    <h2>Fallacies</h2>
+    <div id="fallacies"></div>
+  </section>
+  <section>
+    <h2>Bias</h2>
+    <p id="bias"></p>
+  </section>
+  <section>
+    <h2>Semantics</h2>
+    <p id="semantics"></p>
+  </section>
+  <section>
+    <h2>Full JSON report</h2>
+    <pre id="raw"></pre>
+  </section>
+</div>
+
+<script>
+document.getElementById('go').addEventListener('click', async () => {
+  const text = document.getElementById('text').value;
+  const status = document.getElementById('status');
+  status.textContent = 'Analysing...';
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    });
+    if (!res.ok) { status.textContent = 'Error: ' + res.status; return; }
+    const r = await res.json();
+    status.textContent = '';
+    document.getElementById('report').hidden = false;
+    document.getElementById('overall').textContent = r.textdna_score.overall;
+    document.getElementById('barfill').style.width = r.textdna_score.overall + '%';
+    document.getElementById('summary').textContent = r.summary;
+    document.getElementById('subscores').textContent =
+      Object.entries(r.textdna_score.sub_scores).map(([k, v]) => k + ': ' + v).join('\n');
+    document.getElementById('entities').innerHTML =
+      r.linguistic.entities.map(e => '<li>' + e.text + ' (' + e.label + ')</li>').join('') || '<li>none</li>';
+    document.getElementById('argument').textContent =
+      r.argument.is_argumentative
+        ? 'Argumentative: ' + r.argument.claim_count + ' claim(s), ' + r.argument.premise_count + ' premise(s).'
+        : 'No clear claim + premise structure detected.';
+    document.getElementById('roles').innerHTML =
+      r.argument.sentences.map(s => '<li>[' + s.role + '] ' + s.sentence + '</li>').join('');
+    document.getElementById('fallacies').innerHTML =
+      r.fallacies.length
+        ? '<ul>' + r.fallacies.map(f =>
+            '<li class="flag"><b>' + f.type + '</b>: "' + f.matched_text + '" -- ' + f.explanation + '</li>').join('') + '</ul>'
+        : '<p class="ok">No fallacy patterns detected.</p>';
+    document.getElementById('bias').textContent =
+      'Bias score ' + r.bias.bias_score + ' (biased at >= ' + r.bias.threshold + '). Loaded terms: ' +
+      (r.bias.loaded_terms_found.join(', ') || 'none');
+    document.getElementById('semantics').textContent =
+      'Coherence ' + r.semantic.coherence + ', drift ' + r.semantic.drift +
+      ' (embedding backend: ' + r.semantic.backend + ').';
+    document.getElementById('raw').textContent = JSON.stringify(r, null, 2);
+  } catch (err) {
+    status.textContent = 'Request failed: ' + err;
+  }
+});
+</script>
+</body>
+</html>
